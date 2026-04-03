@@ -1,0 +1,9 @@
+{
+  "name": "lakshit-ai",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "recharts": "^2.8.0"
+  }
+}
