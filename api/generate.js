@@ -1,48 +1,43 @@
 import { generateReply } from "../lib/brain.js";
 import { format } from "../lib/design.js";
-import { track } from "../lib/store.js";
+import { track, saveHistory } from "../lib/store.js";
 
 let globalReplies = [];
 
 export default function handler(req, res) {
   try {
 
-    // 🌐 GET SUPPORT (Chrome / Browser)
+    // 🌐 GET (query mode)
     if (req.method === "GET") {
+
+      const message = req.query.message || "hello";
+      const userId = req.query.user || "web";
+
+      const { text } = generateReply(userId, message);
+      let final = format(text);
+
       return res.json({
         ok: true,
-        status: "online",
-        message: "API is running",
-        usage: {
-          method: "POST",
-          headers: {
-            "x-user-id": "string",
-            "x-message": "string"
-          }
-        },
-        example: {
-          curl: "curl -X POST https://lakshit-ai.vercel.app/api/generate -H \"x-user-id: 1\" -H \"x-message: hello\""
-        }
+        mode: "GET",
+        reply: final,
+        input: message
       });
     }
 
-    // 🔥 POST MAIN LOGIC
+    // 🔥 POST
     if (req.method === "POST") {
 
       const userId = req.headers["x-user-id"] || "u";
       const message = req.headers["x-message"] || "hi";
 
-      // 🌐 IP detect
       const ip =
         req.headers["x-forwarded-for"]?.split(",")[0] ||
         req.headers["x-real-ip"] ||
         req.socket?.remoteAddress ||
         "0.0.0.0";
 
-      // 📊 analytics
       track(userId, ip);
 
-      // 🧠 AI reply
       const { text } = generateReply(userId, message);
 
       let final = format(text);
@@ -55,6 +50,9 @@ export default function handler(req, res) {
       globalReplies.push(final);
       if (globalReplies.length > 100) globalReplies.shift();
 
+      // 🧠 save history
+      saveHistory(userId, message, final);
+
       return res.json({
         ok: true,
         action: "reply",
@@ -63,21 +61,13 @@ export default function handler(req, res) {
       });
     }
 
-    // ❌ invalid method
-    return res.status(405).json({
-      ok: false,
-      error: "Method Not Allowed"
-    });
+    return res.status(405).json({ ok: false });
 
-  } catch (err) {
-    console.error(err);
-
+  } catch {
     return res.json({
       ok: true,
-      action: "reply",
       reply: "⚡ *Done*",
-      delete_after: 6,
       fallback: true
     });
   }
-  }
+}
