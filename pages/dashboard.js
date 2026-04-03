@@ -1,32 +1,36 @@
 import { useEffect, useState } from "react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 export default function Dashboard(){
-  const [data,setData]=useState(null);
+
+  const [data,setData] = useState(null);
+
+  async function load(){
+    const res = await fetch("/api/analytics");
+    const json = await res.json();
+    setData(json);
+  }
 
   useEffect(()=>{
-    fetch("/api/analytics")
-    .then(r=>r.json())
-    .then(setData);
+    load();
+
+    // 🔥 auto refresh every 3 sec
+    const i = setInterval(load,3000);
+
+    return ()=>clearInterval(i);
   },[]);
 
   if(!data) return <div style={{color:"#fff"}}>Loading...</div>;
 
   const usage = data.usage;
 
-  const chartData = Object.entries(usage.users).map(([u,c],i)=>({
-    name:`U${i+1}`,
-    usage:c
-  }));
-
   return (
     <div style={{
       background:"#0a0a0a",
       color:"#fff",
       minHeight:"100vh",
-      padding:"30px"
+      padding:"20px"
     }}>
-      <h1>⚡ Advanced Dashboard</h1>
+      <h1>⚡ Live Dashboard</h1>
 
       <div style={card}>
         <h2>Total Requests</h2>
@@ -39,21 +43,19 @@ export default function Dashboard(){
       </div>
 
       <div style={card}>
-        <LineChart width={500} height={250} data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
-          <Line dataKey="usage" />
-        </LineChart>
+        <h2>Users</h2>
+        {Object.entries(usage.users).map(([u,c])=>(
+          <div key={u}>{u} → {c}</div>
+        ))}
       </div>
+
     </div>
   );
 }
 
 const card = {
   background:"#111",
-  padding:"20px",
-  margin:"20px 0",
+  padding:"15px",
+  margin:"10px 0",
   borderRadius:"10px"
 };
