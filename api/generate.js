@@ -1,53 +1,63 @@
 import { generateLocalAI } from "../lib/brain.js";
 import { format } from "../lib/design.js";
-import { track } from "../lib/store.js";
 
 let userState = {};
 let globalReplies = [];
 
-export default function handler(req,res){
-  try{
+export default function handler(req, res) {
+  try {
     const userId = req.headers["x-user-id"] || "u";
     const message = req.headers["x-message"] || "hi";
 
     const now = Date.now();
 
-    if(!userState[userId]){
-      userState[userId] = { last:0 };
+    if (!userState[userId]) {
+      userState[userId] = { last: 0 };
     }
 
     const user = userState[userId];
 
-    // 🚫 5 min cooldown
-    if(now - user.last < 300000){
-      return res.json({ ok:true, action:"skip" });
+    // 🚫 cooldown (5 min)
+    if (now - user.last < 300000) {
+      return res.json({ ok: true, action: "skip" });
     }
 
-    track(userId);
+    // 🧠 AI GENERATE
+    const result = generateLocalAI(userId, message);
 
-    // 🧠 local AI
-    let reply = generateLocalAI(message);
+    if (!result || !result.reply) {
+      throw new Error("AI failed");
+    }
 
-    let final = format(reply);
+    let final = format(result.reply);
 
-    // 🚫 anti repeat
-    if(globalReplies.includes(final)){
+    // 🚫 anti repeat safety
+    if (globalReplies.includes(final)) {
       final = format("Done");
     }
 
     globalReplies.push(final);
-    if(globalReplies.length > 100) globalReplies.shift();
+    if (globalReplies.length > 100) globalReplies.shift();
 
     user.last = now;
 
     return res.json({
-      ok:true,
-      action:"reply",
+      ok: true,
+      action: "reply",
       reply: final,
       delete_after: 6
     });
 
-  }catch(e){
-    return res.json({ ok:false });
+  } catch (err) {
+    console.error("ERROR:", err.message);
+
+    // 🔥 fallback response (never fail)
+    return res.json({
+      ok: true,
+      action: "reply",
+      reply: "⚡ *Done*",
+      delete_after: 6,
+      fallback: true
+    });
   }
-}
+      }
